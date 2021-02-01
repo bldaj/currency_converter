@@ -1,4 +1,5 @@
 import re
+from decimal import Decimal
 from urllib.request import urlopen
 
 from settings import CBR_URL
@@ -20,13 +21,14 @@ def get_currency() -> dict:
     total_count = len(data)
     iterations = total_count // 5
 
+    offset_increment = 5
     result = dict()
     for i in range(iterations):
-        current_currency = data[offset:offset + 5]
+        current_currency = data[offset:offset + offset_increment]
         result[current_currency[1]] = {
             'quantity': int(current_currency[2]),
-            'rate': float(current_currency[4].replace(',', '.'))
+            'rate': Decimal(current_currency[4].replace(',', '.'))
         }
-        offset += 5
+        offset += offset_increment
 
     return result
