@@ -26,8 +26,8 @@ class CurrencyConverterHandler(BaseHTTPRequestHandler):
     def convert_to_rub(self, quantity: int, currency_obj: dict) -> float:
         """
         Converts requested currency to rub
-        :param quantity:
-        :param currency_obj:
+        :param quantity: requested value
+        :param currency_obj: data about currency
         :return:
         """
         currency_rate = currency_obj['rate'] / currency_obj['quantity']
