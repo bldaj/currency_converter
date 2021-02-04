@@ -106,6 +106,7 @@ if __name__ == '__main__':
     getcontext().prec = 4
     getcontext().rounding = ROUND_HALF_UP
 
+    print('Starting server')
     handler = CurrencyConverterHandler
     httpd = HTTPServer(SERVER_ADDRESS, handler)
     httpd.serve_forever()
