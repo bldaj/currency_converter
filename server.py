@@ -43,7 +43,7 @@ class CurrencyConverterHandler(BaseHTTPRequestHandler):
                 value = data[field]
                 assert isinstance(value, field_type)
             except KeyError:
-                errors.append(f"Field '{field}' does not exist")
+                errors.append(f"Field '{field}' does not provided")
             except AssertionError:
                 errors.append(f"Field '{field}' is not type of {field_type}")
 
