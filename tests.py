@@ -1,6 +1,7 @@
 from decimal import Decimal
 from http import client, HTTPStatus
 from http.server import HTTPServer
+import json
 import threading
 import unittest
 from unittest.mock import Mock
@@ -10,7 +11,7 @@ import server
 
 
 class TestScrapper(unittest.TestCase):
-    """"""
+    """Tests for scrapper module"""
 
     def setUp(self):
         test_data = ['840', 'USD', '1', 'Доллар США', '75,9051', '978', 'EUR', '1', 'Евро', '91,6250']
@@ -27,8 +28,9 @@ class TestScrapper(unittest.TestCase):
 
 
 class NoLogRequestHandler:
+    """Mixin to disable writing log messages to stderr"""
+
     def log_message(self, *args):
-        # don't write log messages to stderr
         pass
 
     def read(self, n=None):
@@ -41,6 +43,8 @@ class TestCurrencyConverterHandler(NoLogRequestHandler, server.CurrencyConverter
 
 
 class TestServerThread(threading.Thread):
+    """Runs test server in a thread"""
+
     def __init__(self, test_object):
         threading.Thread.__init__(self)
         self.test_object = test_object
@@ -61,8 +65,12 @@ class TestServerThread(threading.Thread):
 
 
 class TestCurrencyHandler(unittest.TestCase):
+    """Tests for CurrencyConverterHandler"""
 
     def setUp(self):
+        test_data = ['840', 'USD', '1', 'Доллар США', '75,9051', '978', 'EUR', '1', 'Евро', '91,6250']
+        scraper.get_data_from_site = Mock(return_value=test_data)
+
         self.server_started = threading.Event()
         self.thread = TestServerThread(self)
         self.thread.start()
@@ -74,18 +82,75 @@ class TestCurrencyHandler(unittest.TestCase):
         self.thread.stop()
         self.thread = None
 
-    def request(self, uri, method='GET', body=None, headers={}):
-        self.connection = client.HTTPConnection(self.HOST, self.PORT)
-        self.connection.request(method, uri, body, headers)
-        return self.connection.getresponse()
-
     def test_get_not_implemented(self):
+        """Tests not implemented GET method"""
+
         self.con.request('GET', '/')
         res = self.con.getresponse()
         self.assertEqual(res.status, HTTPStatus.NOT_IMPLEMENTED)
 
-    def test_post(self):
+    def test_currency_conversion_success(self):
+        """Tests currency conversion handler"""
+
+        data = {
+            'currency': 'USD',
+            'quantity': 1
+        }
+        self.con.request('POST', '/', body=json.dumps(data))
+        res = self.con.getresponse()
+
+        expected_data = json.dumps(
+            {
+                'currency': 'USD',
+                'requested_value': 1,
+                'converted_value': 75.9051
+            }
+        ).encode('utf-8')
+
+        self.assertEqual(res.status, HTTPStatus.OK)
+        self.assertEqual(expected_data, res.read())
+
+    def test_currency_conversion_failed(self):
+        """Tests CurrencyConverterHandler because of empty request body"""
+
         self.con.request('POST', '/')
         res = self.con.getresponse()
 
-        print(f"\nres.read(): {res.read()}")
+        expected_data = json.dumps(
+            {"error": "Error was occurred during deserializing request data"}
+        ).encode('utf-8')
+        self.assertEqual(res.status, HTTPStatus.BAD_REQUEST)
+        self.assertEqual(expected_data, res.read())
+
+    def test_currency_does_not_supported(self):
+        """Tests requested currency does not supported"""
+
+        data = {
+            'currency': 'AUD',
+            'quantity': 1
+        }
+        self.con.request('POST', '/', body=json.dumps(data))
+        res = self.con.getresponse()
+
+        expected_data = json.dumps(
+            {"error": "Requested currency does not supported"}
+        ).encode('utf-8')
+        self.assertEqual(res.status, HTTPStatus.BAD_REQUEST)
+        self.assertEqual(expected_data, res.read())
+
+    def test_validation(self):
+        """Tests request params validation"""
+
+        data = {
+            'abc': 'USD',
+            'quantity': '1'
+        }
+        self.con.request('POST', '/', body=json.dumps(data))
+        res = self.con.getresponse()
+
+        expected_data = json.dumps(
+            {'error': "Field 'currency' does not provided. Field 'quantity' is not type of <class 'int'>"}
+        ).encode('utf-8')
+
+        self.assertEqual(res.status, HTTPStatus.BAD_REQUEST)
+        self.assertEqual(expected_data, res.read())
